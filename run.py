@@ -10,8 +10,9 @@ prompt = "DB_"+id+'> '
 #각 query에 해당하는 것에 대한 request를 받았다는 출력을 하는 메소드
 class MyTransformer(Transformer):
     def __init__(self, prompt):
-        super().__init__()
-        self.prompt = prompt
+       #super().__init__()
+       pass
+       self.prompt = prompt
     def create_table_query(self, items):
         print(prompt+"'CREATE TABLE' requested")
     def drop_table_query(self, items):
@@ -20,6 +21,7 @@ class MyTransformer(Transformer):
         print(prompt+"'SELECT' requested")
     def insert_query(self, items):
         print(prompt+"'INSERT' requested")
+        print("나는 자연인이다",items,"나는 자연인이다")
     def delete_query(self, items):
         print(prompt+"'DELETE' requested")
     def update_query(self, items):
@@ -54,16 +56,17 @@ while(True):
     if input_str.endswith(';'):
         #받은 input_str을 ;에 대해 split한다.
         query_list = [s.strip() for s in input_str.split(';') if s.strip()]
-        #print(query_list)
+        print(query_list)
         for q in query_list:
             #query_list element에 다시 ;을 붙여주고 transform에 넘겨준다.
             try:
                 output = sql_parser.parse(q+';')
-                MyTransformer().transform(output)
+                #print(output,'\n')
+                MyTransformer(prompt).transform(output)
                 
-            except :
+            except Exception as e:
             # 문법상 오류가 있을 경우 Syntax error를 출력한다.
-                print(prompt+"Syntax error")
+                print(prompt+"Syntax error",e)
                 input_str = ""
                 flag=False
                 break
