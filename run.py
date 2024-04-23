@@ -1,11 +1,9 @@
-from lark import Lark, Transformer, Tree, Token, Visitor
+from lark import Lark, Transformer, Tree, Token
 import os, sys
 from berkeleydb import db
 import pickle
 import ErrorMessage as em
 
-PRIMARY_KEY = 1
-FOREIGN_KEY = 2
 
 with open('grammar.lark') as file:
     sql_parser = Lark(file.read(),start="command",lexer="basic")
@@ -26,6 +24,7 @@ class MyTransformer(Transformer):
         # Create directory if it does not exist
         if not os.path.exists('DB'):
             os.makedirs('DB')
+        # Open BerkeleyDB databases for schema and data
         self.my_schema_db = db.DB()
         self.my_schema_db.open("DB/mySchemaDB.db", db.DB_HASH, db.DB_CREATE)
         self.my_data_db = db.DB()
@@ -34,7 +33,7 @@ class MyTransformer(Transformer):
         self.data_cursor = self.my_data_db.cursor()
 
 
-    
+    # Create table
     def create_table_query(self, items):
         
         table_name = items[2].children[0].lower() #table name
@@ -47,7 +46,7 @@ class MyTransformer(Transformer):
         primary_key_list= []
         foreign_key_list = []
         referenced_table_and_columns_list = []
-
+        # Initialize primary key count for checking duplicate primary key definitions
         primary_key_count = 0
         
         #get primary key
@@ -82,7 +81,6 @@ class MyTransformer(Transformer):
                     if referenced_table and referenced_columns:  # only proceed if referenced table and columns were found
                         referenced_table_and_columns_list.append((tuple(foreign_key_columns), referenced_table, tuple(referenced_columns)))
         
-
         for column_definition in column_definition_iter:
             if column_definition.children and len(column_definition.children) > 0:
                 column_name = column_definition.children[0].children[0].lower() if column_definition.children[0].children else None
@@ -92,6 +90,7 @@ class MyTransformer(Transformer):
                 if column_definition.children[1].children and len(column_definition.children[1].children) > 1:
                     column_type += column_definition.children[1].children[1] + column_definition.children[1].children[2] + column_definition.children[1].children[3] if column_definition.children[1].children else None
 
+                # Check if null is allowed
                 if column_name in primary_key_list:
                     column_null = 'N'
                 elif column_definition.children[2] is not None:
@@ -99,6 +98,7 @@ class MyTransformer(Transformer):
                 else:
                     column_null = 'Y'
 
+                # check if there is a reference
                 column_reference = ''
                 for foreign_key, referenced_table, referenced_columns in referenced_table_and_columns_list:
                     if foreign_key[0] not in foreign_key_list:
@@ -107,7 +107,8 @@ class MyTransformer(Transformer):
                         foreign_key_list.append(column_name)
                         column_reference = (referenced_table, referenced_columns)
                         break
-
+                
+                # Check if the column is a primary key, foreign key, or both
                 if column_name in primary_key_list and column_name in foreign_key_list:
                     column_key = 'PRI/FOR'
                 elif column_name in primary_key_list:
@@ -119,10 +120,8 @@ class MyTransformer(Transformer):
 
             if column_name is not None and column_type is not None and column_null is not None and column_key is not None:
                 column_name_list.append(column_name)
-                column_constraint_list.append((column_type, column_null, column_key, column_reference))
+                column_constraint_list.append((column_type, column_null, column_key, column_reference))   
         
-        #print(foreign_key_list)
-        #print(column_name_list)
         # Check if all foreign keys exist in the column names
         for foreign_key in foreign_key_list:
             if foreign_key not in column_name_list:
@@ -130,7 +129,6 @@ class MyTransformer(Transformer):
                 return
         
         # Check for table existence errors
-        
         result = self.schema_cursor.first()
         while result is not None:
             key, _ = result
@@ -138,18 +136,7 @@ class MyTransformer(Transformer):
                 self.printer.table_existence_error()
                 self.schema_cursor.close()
                 return
-            result = self.schema_cursor.next()
-                
-    
-       
-
-        existing_tables = [key.decode('utf-8') for key in self.my_schema_db.keys()]       
-        existing_columns = []
-        for table_key in self.my_schema_db.keys():
-            table_schema = pickle.loads(self.my_schema_db.get(table_key))
-            existing_columns.append([column_name for column_name, _ in table_schema])
-        
-        
+            result = self.schema_cursor.next()               
                 
         # Check for duplicate column names
         if len(set(column_name_list)) != len(column_name_list):
@@ -212,15 +199,11 @@ class MyTransformer(Transformer):
                     if len(referenced_columns) > 1:
                         column_type = [column_type for column_name, (column_type, _, _, _) in zip(column_name_list, column_constraint_list) if column_name == referenced_column][0]
                     
-                    
-
                     # Check if the types match
                     if column_type != referenced_column_type:   
                         self.printer.reference_type_error()
                         return
                     
-                
-                
         # Check for reference table existence errors and reference column existence errors and reference non-primary key errors
         if column_key == 'FOR' or column_key == 'PRI/FOR':
             referenced_table, referenced_column = column_reference
@@ -308,11 +291,6 @@ class MyTransformer(Transformer):
                         return
 
 
-        # Check for table existence errors
-        if table_name.lower() in existing_tables:
-            self.printer.table_existence_error()
-            return
-
         # Check for char length errors
         for column_name, (column_type, column_null, column_key, column_reference) in zip(column_name_list, column_constraint_list):
             if column_type.startswith("char"):
@@ -327,15 +305,9 @@ class MyTransformer(Transformer):
         # zip makes tuple of column name and column type/ ex) ('column1', ('int', 'not null', 'primary_key', ''))
         schema = list(zip(column_name_list, column_constraint_list))
         self.my_schema_db.put(table_name.encode(), pickle.dumps(schema))
+        self.printer.create_table_success(table_name)
 
-        try:
-            data = self.my_schema_db.get(table_name.encode())
-            unpickled_data = pickle.loads(data)
-            self.printer.create_table_success(table_name)
-
-        except pickle.UnpicklingError:
-            print("Data is not pickle data")
-
+        
         
     def drop_table_query(self, items):
         table_name  = items[2].children[0].lower()
@@ -364,31 +336,39 @@ class MyTransformer(Transformer):
 
 
     def select_query(self, items):
+        """
+        Executes a SELECT query on the specified table.
+
+        Args:
+            items (list): A list of items representing the parsed query.
+
+        Returns:
+            None
+
+        Raises:
+            None
+
+        """
         table_name = items[2].children[0].children[1].children[0].children[0].children[0].value.lower()
         # Check if table exists
         if not self.my_schema_db.exists(table_name.encode()):
             self.printer.select_table_existence_error(table_name)
             return
-                    
+
         # SELECT *
         if isinstance(items[1], Tree) and items[1].data == "select_list" and len(items[1].children) == 0:
             try:
-
                 data = self.my_data_db.get(table_name.encode())
                 unpickled_data = pickle.loads(data) if data is not None else []
-                
+
                 # Get schema
                 schema_data = self.my_schema_db.get(table_name.encode())
                 schema = pickle.loads(schema_data)
 
                 # Extract column names from schema
-
-                #column_names = [column[0].upper() for column in schema]
                 column_names = [column[0] for column in schema]
                 # Calculate max length for each column
-                
-
-                max_lengths = [max(len(str(row[column].value)) if isinstance(row[column], Token) else len(str(row[column])), len(column)) for row in unpickled_data for column in column_names] if unpickled_data else [len(column) for column in column_names]                
+                max_lengths = [max(len(str(row[column].value)) if isinstance(row[column], Token) else len(str(row[column])), len(column)) for row in unpickled_data for column in column_names] if unpickled_data else [len(column) for column in column_names]
                 for column, max_length in zip(column_names, max_lengths):
                     print('+' + '-' * (max_length + 2), end='')
                 print('+')
@@ -405,16 +385,13 @@ class MyTransformer(Transformer):
                             value = value.strip('\'"')
                         print('| ' + value.ljust(max_length) + ' ', end='')
                     print('|')
-                    #for column, max_length in zip(column_names, max_lengths):
-                     #   print('+' + '-' * (max_length + 2), end='')
-                    #print('+')
                 for column, max_length in zip(column_names, max_lengths):
                     print('+' + '-' * (max_length + 2), end='')
                 print('+')
             except pickle.UnpicklingError:
                 print("Data is not pickle data")
-                            
-        # SELECT column_name
+
+        # SELECT column_name for project 1-3
         elif isinstance(items[1], Tree) and items[1].data == "select_list":
             column_names = [child.children[1].children[0].value.lower() for child in items[1].children]
             print('SELECT', ', '.join(column_names), 'FROM', table_name)
@@ -552,13 +529,15 @@ class MyTransformer(Transformer):
 
 
     def explain_query(self,items):
+        # Get the table name from the query
         table_name = items[1].children[0].lower()
-        # Check if the table exists
+        
+        # Check if the table exists in the schema database
         if not self.my_schema_db.exists(table_name.encode()):
             self.printer.no_such_table()
             return
 
-        # Get the schema of the table
+        # Get the schema of the table from the schema database
         table_schema = pickle.loads(self.my_schema_db.get(table_name.encode()))
 
         # Print the table name
@@ -566,9 +545,9 @@ class MyTransformer(Transformer):
         print(f'table_name [{table_name}]')
         print('{:<15} {:<10} {:<5} {:<10}'.format('column_name', 'type', 'null', 'key'))
 
-        # Print the schema
+        # Print the schema of the table
         for column_name, (column_type, column_null, column_key, column_reference) in table_schema:
-             print('{:<15} {:<10} {:<5} {:<10}'.format(column_name, column_type, column_null, column_key))
+            print('{:<15} {:<10} {:<5} {:<10}'.format(column_name, column_type, column_null, column_key))
 
         print('-' * 65)
 
@@ -627,6 +606,18 @@ class MyTransformer(Transformer):
 
 
     def EXIT(self,items):
+        """
+        Closes the database connections and exits the program.
+
+        Args:
+            items (list): A list of items representing the parsed query.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self.schema_cursor.close()
         self.data_cursor.close()
         self.my_schema_db.close()

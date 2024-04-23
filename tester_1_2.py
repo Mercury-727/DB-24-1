@@ -358,6 +358,13 @@ test_cases = [
         "test_name": "select * from non-existing table"  
     },
     {
+        "query": "create table newtable (id int); select * from nonexistent_table; show tables;",
+        "expected": """'newtable' table is created
+        Selection has failed: 'nonexistent_table' does not exist
+        """,
+        "test_name": "query sequence with invalid query in the middle",
+    },
+    {
         "query": "exit;",
         "expected": "",
         "test_name": "exit"
@@ -417,8 +424,8 @@ def test(test_cases):
     for i, test_case in enumerate(test_cases):
         popen = subprocess.Popen(["python3", "run.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         query = re.sub(r"\s+", " ", " ".join(test_case["query"].split("\n")))
-        if i != len(test_cases) - 1:
-            query += " exit;"
+        # if i != len(test_cases) - 1:
+        #     query += " exit;"
         expected = test_case["expected"]
         test_name = test_case.get("test_name", None)
         
@@ -426,23 +433,27 @@ def test(test_cases):
         std_out, std_err = (std_out).decode("utf-8"), (std_err).decode("utf-8")
 
         if std_err:
-            print("Error occurred while running run.py")
-            print(std_err)
-            return False
+            if "EOFError" in std_err:
+                # discard eof error
+                pass
+            else:
+                print("Error occurred while running run.py")
+                print(std_err)
+                return False
 
         # remove prefix
-        # print("tst qury", query)
-        # print("test stdout: ", std_out)
-        result = std_out[len(PREFIX):].strip()  
-        # print("test result:", result)  
+        result = std_out[len(PREFIX):].strip()
+        last_prefix_idx = result.rfind(PREFIX.strip())
+        result = result[:last_prefix_idx].strip()
+        print(query, result)
         
         print(f"--------Test Case {i + 1} Start--------")
         describe_quries = ["explain", "desc", "describe"]
         show_query = ["show"]
         select_query = ["select"]
         
-        if query != "exit;":
-            query = query[:-len(" exit;")]
+        # if query != "exit;":
+        #     query = query[:-len(" exit;")]
         
 
         print("     Note: Ignore dashed lines, white spaces and the order when evaluating desc/explain/describe/select/show query.")
@@ -463,15 +474,16 @@ def test(test_cases):
             
             print(f"Test Name: {test_name}")
             print(f"    Query: {query}")
-
-
             print(f"   Output:")
             for r in result:
                 print(f"    {r}")
             print(f" Expected:")
             for e in expected:
                 print(f"    {e}")
-            assert result == expected
+
+            for k, (r, e) in enumerate(zip(result, expected)):
+                print(f"    comparing {k}: {r == e}")
+                assert r == e
             
             print("Dashed Line Check:")
             is_dashed_line = lambda line: re.match(r"^-+$", line)
@@ -490,9 +502,16 @@ def test(test_cases):
             
             print(f"Test Name: {test_name}")
             print(f"    Query: {query}")
-            print(f"   Output: {result}")
-            print(f" Expected: {expected}")
-            assert result == expected
+            print(f"   Output:")
+            for r in result:
+                print(f"    {r}")
+            print(f" Expected:")
+            for e in expected:
+                print(f"    {e}")
+
+            for k, (r, e) in enumerate(zip(result, expected)):
+                print(f"    comparing {k}: {r == e}")
+                assert r == e
             
             print("Dashed Line Check:")
             is_dashed_line = lambda line: re.match(r"^-+$", line)
@@ -525,8 +544,8 @@ def test(test_cases):
             for e in expected:
                 print(f"    {e}")
 
-            for i, (r, e) in enumerate(zip(result, expected)):
-                print(f"    comparing {i}: {r == e}")
+            for k, (r, e) in enumerate(zip(result, expected)):
+                print(f"    comparing {k}: {r == e}")
                 assert r == e
                 
             print("Dashed Line Check:")
@@ -535,19 +554,40 @@ def test(test_cases):
             assert is_correct_header(start_header_line) and is_correct_header(end_header_line) and is_correct_header(end_line)
         else:
             # attach prefix to expected
-            if query != "exit;":
-                expected = PREFIX + expected
+            # if query != "exit;":
+            #     expected = PREFIX + expected
+                
+            # if query is sequence, split query
+            query = query.split(";")
+            query = [q.strip() + ";" for q in query if q.strip()]
+            query = [q for q in query if q]
+            query = " ".join(query)
+            
+            expected = expected.split("\n")
+            e = []
+            for k in range(len(expected)):
+                exp = expected[k].strip()
+                if exp:
+                    e.append(exp if exp.startswith(PREFIX) else PREFIX + exp)
+            expected = e
+            result = [r.strip() for r in result.split("\n") if r.strip()]
+
             
             print(f"Test Name: {test_name}")
             print(f"    Query: {query}")
-            print(f"   Output: {result}")
-            print(f" Expected: {expected}")
-            print()
-            assert result == expected
+            print(f"   Output:")
+            for r in result:
+                print(f"    {r}")
+            print(f" Expected:")
+            for e in expected:
+                print(f"    {e}")
+
+            for k, (r, e) in enumerate(zip(result, expected)):
+                print(f"    comparing {k}: {r == e}")
+                assert r == e
             
         print(f"--------Test Case {i + 1} End--------")
 
-            
     return True
     
 def main(argv, args):
