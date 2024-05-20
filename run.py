@@ -12,6 +12,7 @@ with open('grammar.lark') as file:
 id = '2020-13624'
 prompt = "DB_"+id+'> '
 
+# Check if the date string is in the correct format
 def is_valid_date_format(date_string, date_format):
     try:
         datetime.strptime(date_string, date_format)
@@ -20,6 +21,7 @@ def is_valid_date_format(date_string, date_format):
         return False
 date_format = '%Y-%m-%d'
 
+# compare two operands with operator
 def comparator(operand1, operator, operand2):
     if operand1.isdigit():
         operand1 = int(operand1)
@@ -795,10 +797,7 @@ class MyTransformer(Transformer):
                     
                     
                     if isinstance(where_clause_values[0], str) and where_clause_values[0].startswith(("'", '"')):
-                        where_clause_values[0] = where_clause_values[0][1:-1]
-                    
-                    
-                    
+                        where_clause_values[0] = where_clause_values[0][1:-1]      
                     for row in result_data:
                         
                         # Assume that where_clause_operator is the comparison operator
@@ -902,7 +901,7 @@ class MyTransformer(Transformer):
                     
                     conditions_met = []
                     for i in range(len(where_clause_attributes1)):
-                        if const_flags[i] == False:
+                        if const_flags[i] == False:# if there is a constant value, compare the constant value with the attribute
                         
                             if row[column_names[i]] == 'null' and operators[i] not in ['is', 'is not']:
                                 continue
@@ -932,7 +931,7 @@ class MyTransformer(Transformer):
                                     conditions_met.append(True)
                                 else:
                                     conditions_met.append(False)   
-                        else:
+                        else: # if there is a constant value, compare the only constant values
                             if where_clause_values[i].startswith(("'", '"')):
                                 where_clause_values[i] = where_clause_values[i][1:-1]
                             conditions_met.append(comparator(where_clause_attributes1[i],operators[i],where_clause_values[i]))
@@ -995,8 +994,6 @@ class MyTransformer(Transformer):
                             where_clause_attributes2[i] = table_name2 + '.' + where_clause_attributes2[i]
                 # Filter the data
                 for i in range(len(values)):
-
-                    
                     if isinstance(values[i], str) and values[i].startswith(("'", '"')):
                         values[i] = values[i][1:-1]
                     
@@ -1006,9 +1003,8 @@ class MyTransformer(Transformer):
                     conditions_met = []
                     
                     for i in range(len(where_clause_attributes1)):
-                        if const_flags[i] == False:
-                            
-                            
+                        # if there is a constant value, compare the constant value with the attribute
+                        if const_flags[i] == False:         
                             if row[column_names[i]] == 'null' and operators[i] not in ['is', 'is not']:
                                 continue
                            
@@ -1036,13 +1032,13 @@ class MyTransformer(Transformer):
                                     conditions_met.append(True)
                                 else:
                                     conditions_met.append(False)
-                        else:
+                        else: # if there is a constant value, compare the only constant values
                             if where_clause_values[i].startswith(("'", '"')):
                                 where_clause_values[i] = where_clause_values[i][1:-1]
                             conditions_met.append(comparator(where_clause_attributes1[i],operators[i],where_clause_values[i]))
                     if any(conditions_met):
                         filtered_data.append(row)
-                
+                # If there are no rows that satisfy the conditions, return an empty dictionary
                 if filtered_data == []:
                     filtered_data = [{}]
                 result_data = filtered_data
