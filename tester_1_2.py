@@ -311,7 +311,7 @@ test_cases = [
         "test_name": "recreate table that was dropped"
     },
     {
-        "query": """insert into user values (1, 'Alice', 'F');""",
+        "query": """ insert into user values (1, 'Alice', 'F');""",
         "expected": "The row is inserted",
         "test_name": "insert into user",
     },

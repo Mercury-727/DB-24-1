@@ -44,11 +44,38 @@ class PrintError:
     def drop_referenced_table_error(self, table_name):
         print(self.prompt + f"Drop table has failed: '{table_name}' is referenced by other table")
 
-    def insert_result(self):
-        print(self.prompt + "The row is inserted")
+    def insert_result(self, count):
+        print(self.prompt + f"{count} row inserted")
 
     def insert_value_error(self):
-        print(self.prompt + "Insertion has failed: type mismatch")
+        print(self.prompt + "Insertion has failed: Types are not matched")
+
+    def insert_column_non_nullable_error(self, colName):
+        print(self.prompt + f"Insertion has failed: '{colName}' is not nullable")
+
+    def insert_column_existence_error(self, colName):
+        print(self.prompt + f"Insertion has failed: '{colName}' does not exist")
 
     def select_table_existence_error(self, table_name):
         print(self.prompt + f"Selection has failed: '{table_name}' does not exist")
+    
+    def delete_result(self, count):
+        print(self.prompt + f"{count} row(s) deleted")
+
+
+    def select_column_resolve_error(self, colName):
+        print(self.prompt + f"Selection has failed: fail to resolve '{colName}'")
+
+    def where_incomparable_error(self):
+        print(self.prompt + "Where clause trying to compare incomparable values")
+
+    def where_table_not_specified(self):
+        print(self.prompt + "Where clause trying to reference tables which are not specified")
+
+    def where_column_not_exist(self):
+        print(self.prompt + "Where clause trying to reference non existing column")
+
+    def where_ambiguous_reference(self):
+        print(self.prompt + "Where clause contains ambiguous reference")
+
+    
