@@ -23,10 +23,13 @@ date_format = '%Y-%m-%d'
 
 # compare two operands with operator
 def comparator(operand1, operator, operand2):
-    if operand1.isdigit():
-        operand1 = int(operand1)
-    if operand2.isdigit():
-        operand2 = int(operand2)
+    if operand1 is not None:
+        if operand1.isdigit():
+            operand1 = int(operand1)
+    if operand2 is not None:
+        if operand2.isdigit():
+            operand2 = int(operand2)
+    
     if operator == '=' and operand1 != operand2:
         return False
     elif operator == '<' and operand1 >= operand2:
@@ -39,9 +42,9 @@ def comparator(operand1, operator, operand2):
         return False
     elif operator == '!=' and operand1 == operand2:
         return False
-    elif operator == 'is' and operand1 != operand2:
+    elif operator == 'is' and not ([operand1,operand2] == [None,'null'] or [operand1,operand2] == ['null',None]):
         return False
-    elif operator == 'is not' and operand1 == operand2:
+    elif operator == 'is not' and ([operand1,operand2] == [None,'null'] or [operand1,operand2] == ['null',None]):
         return False
     else:
         return True
@@ -384,6 +387,11 @@ class MyTransformer(Transformer):
         #Extract all the table names
         table_names_iter = items[2].children[0].find_data("table_name")
         table_names = [child.children[0].value.lower() for child in table_names_iter]
+        
+        #if there are same table names, print error
+        if len(table_names) != len(set(table_names)):
+            self.printer.where_ambiguous_reference()
+            return
         
         # Check if table exists
         for table_name in table_names:
@@ -803,31 +811,34 @@ class MyTransformer(Transformer):
                     if isinstance(where_clause_values[0], str) and where_clause_values[0].startswith(("'", '"')):
                         where_clause_values[0] = where_clause_values[0][1:-1]      
                     for row in result_data:
-                        
+                      
                         # Assume that where_clause_operator is the comparison operator
                         # if the values are string, stripe the quote 
                         
-                        if row[column_name] == 'null' and where_clause_operators[0] not in ['is', 'is not']:
-                            continue
-                        
-                        if isinstance(row[column_name], str) and row[column_name].startswith(("'", '"')):
-                            row[column_name] = row[column_name][1:-1]
-                        if where_clause_attributes2[0] != '':
-                            if isinstance(row[where_clause_attributes2[0]], str) and row[where_clause_attributes2[0]].startswith(("'", '"')):
-                                row[where_clause_attributes2[0]] = row[where_clause_attributes2[0]][1:-1]
-                       
-                        if where_clause_attributes2[0] != '':
-                            operand2 = where_clause_values[0] if comparable_value_position != -1 else row[where_clause_attributes2[0]]
+                        if row[column_name] == None:
+                            if where_clause_operators[0] not in ['is', 'is not']:
+                                continue
+                            if comparator(None,where_clause_operators[0],where_clause_values[0]):
+                                filtered_data.append(row)
                         else:
-                            operand2 = where_clause_values[0] 
+                            if isinstance(row[column_name], str) and row[column_name].startswith(("'", '"')):
+                                row[column_name] = row[column_name][1:-1]
+                            if where_clause_attributes2[0] != '':
+                                if isinstance(row[where_clause_attributes2[0]], str) and row[where_clause_attributes2[0]].startswith(("'", '"')):
+                                    row[where_clause_attributes2[0]] = row[where_clause_attributes2[0]][1:-1]
                         
-                        if comp_op_position <= comparable_value_position or comparable_value_position == -1: # comp_op comes first       
-                            if (comparator(row[column_name],where_clause_operators[0],operand2)):
-                                filtered_data.append(row)
-                        elif comp_op_position > comparable_value_position: # comparable_value comes first
-                        
-                            if (comparator(operand2,where_clause_operators[0],row[column_name])):
-                                filtered_data.append(row)
+                            if where_clause_attributes2[0] != '':
+                                operand2 = where_clause_values[0] if comparable_value_position != -1 else row[where_clause_attributes2[0]]
+                            else:
+                                operand2 = where_clause_values[0] 
+                            
+                            if comp_op_position <= comparable_value_position or comparable_value_position == -1: # comp_op comes first       
+                                if (comparator(row[column_name],where_clause_operators[0],operand2)):
+                                    filtered_data.append(row)
+                            elif comp_op_position > comparable_value_position: # comparable_value comes first
+                            
+                                if (comparator(operand2,where_clause_operators[0],row[column_name])):
+                                    filtered_data.append(row)
                     if filtered_data == []:
                         filtered_data = [{}]
                 else:
@@ -907,34 +918,38 @@ class MyTransformer(Transformer):
                     for i in range(len(where_clause_attributes1)):
                         if const_flags[i] == False:# if there is a constant value, compare the constant value with the attribute
                         
-                            if row[column_names[i]] == 'null' and operators[i] not in ['is', 'is not']:
-                                continue
-                            
-
-                            if isinstance(row[column_names[i]], str) and row[column_names[i]].startswith(("'", '"')):
-                                row[column_names[i]] = row[column_names[i]][1:-1]
-                            if where_clause_attributes2[i] != '':
-                                
-                                if isinstance(row[where_clause_attributes2[i]], str) and row[where_clause_attributes2[i]].startswith(("'", '"')):
-                                    row[where_clause_attributes2[i]] = row[where_clause_attributes2[i]][1:-1]
-                            
-                            if where_clause_attributes2[i] != '':
-                                operand2 = values[i] if comparable_value_positions[i] != -1 else row[where_clause_attributes2[i]]
-                            else:
-                                operand2 = values[i]
-                        
-
-                            if comp_op_positions[i] <= comparable_value_positions[i] or comparable_value_positions[i] == -1:  # comp_op comes first
-                                if comparator(row[column_names[i]], operators[i], operand2):
+                            if row[column_names[i]] == None:
+                                if operators[i] not in ['is', 'is not']:
+                                 continue
+                                if comparator(None, operators[i], values[i]):
                                     conditions_met.append(True)
                                 else:
                                     conditions_met.append(False)
-        
-                            elif comp_op_positions[i] > comparable_value_positions[i]:  # comparable_value comes first
-                                if comparator(operand2, operators[i], row[column_names[i]]):
-                                    conditions_met.append(True)
+                            else:
+                                if isinstance(row[column_names[i]], str) and row[column_names[i]].startswith(("'", '"')):
+                                    row[column_names[i]] = row[column_names[i]][1:-1]
+                                if where_clause_attributes2[i] != '':
+                                    
+                                    if isinstance(row[where_clause_attributes2[i]], str) and row[where_clause_attributes2[i]].startswith(("'", '"')):
+                                        row[where_clause_attributes2[i]] = row[where_clause_attributes2[i]][1:-1]
+                                
+                                if where_clause_attributes2[i] != '':
+                                    operand2 = values[i] if comparable_value_positions[i] != -1 else row[where_clause_attributes2[i]]
                                 else:
-                                    conditions_met.append(False)   
+                                    operand2 = values[i]
+                            
+
+                                if comp_op_positions[i] <= comparable_value_positions[i] or comparable_value_positions[i] == -1:  # comp_op comes first
+                                    if comparator(row[column_names[i]], operators[i], operand2):
+                                        conditions_met.append(True)
+                                    else:
+                                        conditions_met.append(False)
+            
+                                elif comp_op_positions[i] > comparable_value_positions[i]:  # comparable_value comes first
+                                    if comparator(operand2, operators[i], row[column_names[i]]):
+                                        conditions_met.append(True)
+                                    else:
+                                        conditions_met.append(False)   
                         else: # if there is a constant value, compare the only constant values
                             if where_clause_values[i].startswith(("'", '"')):
                                 where_clause_values[i] = where_clause_values[i][1:-1]
@@ -1004,38 +1019,44 @@ class MyTransformer(Transformer):
                     
                 
                 for row in result_data:
+                
                     conditions_met = []
                     
                     for i in range(len(where_clause_attributes1)):
                         # if there is a constant value, compare the constant value with the attribute
                         if const_flags[i] == False:         
-                            if row[column_names[i]] == 'null' and operators[i] not in ['is', 'is not']:
-                                continue
-                           
-                            if isinstance(row[column_names[i]], str) and row[column_names[i]].startswith(("'", '"')):
-                                row[column_names[i]] = row[column_names[i]][1:-1]
-                            if where_clause_attributes2[i] != '':
-                                
-                                if isinstance(row[where_clause_attributes2[i]], str) and row[where_clause_attributes2[i]].startswith(("'", '"')):
-                                    row[where_clause_attributes2[i]] = row[where_clause_attributes2[i]][1:-1]
-                           
-                            if where_clause_attributes2[i] != '':
-                                operand2 = values[i] if comparable_value_positions[i] != -1 else row[where_clause_attributes2[i]]
+                            if row[column_names[i]] == None:
+                                if operators[i] not in ['is', 'is not']:
+                                    continue
+                                if comparator(None, operators[i], values[i]):
+                                    conditions_met.append(True)
+                                else:
+                                    conditions_met.append(False)
                             else:
-                                operand2 = values[i]
-                           
+                                if isinstance(row[column_names[i]], str) and row[column_names[i]].startswith(("'", '"')):
+                                    row[column_names[i]] = row[column_names[i]][1:-1]
+                                if where_clause_attributes2[i] != '':
+                                    
+                                    if isinstance(row[where_clause_attributes2[i]], str) and row[where_clause_attributes2[i]].startswith(("'", '"')):
+                                        row[where_clause_attributes2[i]] = row[where_clause_attributes2[i]][1:-1]
+                            
+                                if where_clause_attributes2[i] != '':
+                                    operand2 = values[i] if comparable_value_positions[i] != -1 else row[where_clause_attributes2[i]]
+                                else:
+                                    operand2 = values[i]
+                            
 
-                            if comp_op_positions[i] <= comparable_value_positions[i] or comparable_value_positions[i] == -1:  # comp_op comes first
-                                if comparator(row[column_names[i]], operators[i], operand2):
-                                    conditions_met.append(True)
-                                else:
-                                    conditions_met.append(False)
-        
-                            elif comp_op_positions[i] > comparable_value_positions[i]:  # comparable_value comes first
-                                if comparator(operand2, operators[i], row[column_names[i]]):
-                                    conditions_met.append(True)
-                                else:
-                                    conditions_met.append(False)
+                                if comp_op_positions[i] <= comparable_value_positions[i] or comparable_value_positions[i] == -1:  # comp_op comes first
+                                    if comparator(row[column_names[i]], operators[i], operand2):
+                                        conditions_met.append(True)
+                                    else:
+                                        conditions_met.append(False)
+            
+                                elif comp_op_positions[i] > comparable_value_positions[i]:  # comparable_value comes first
+                                    if comparator(operand2, operators[i], row[column_names[i]]):
+                                        conditions_met.append(True)
+                                    else:
+                                        conditions_met.append(False)
                         else: # if there is a constant value, compare the only constant values
                             if where_clause_values[i].startswith(("'", '"')):
                                 where_clause_values[i] = where_clause_values[i][1:-1]
@@ -1192,7 +1213,7 @@ class MyTransformer(Transformer):
             for row in result_data:
                 for column, max_length in zip(column_names, max_lengths):
                     if column in row:  # Check if the column exists
-                        value = str(row[column]) if row[column] is not None else 'NULL'  # Get the value directly from row[column]
+                        value = str(row[column]) if row[column] is not None else 'null'  # Get the value directly from row[column]
                         if isinstance(row[column], str):  # if the value is a string, remove the quotes
                             value = value.strip('\'"')
                     else:
@@ -1268,7 +1289,7 @@ class MyTransformer(Transformer):
                 
                 if column_type.startswith('char'):
                     if value is None:
-                        values[i] = "null"
+                        values[i] = None
                     # Check if the value is a string
                     # if value does not startswith a quote, it is not a string
                     
@@ -1299,7 +1320,7 @@ class MyTransformer(Transformer):
                     row_data[column_name] = value
                 # If the column is not in the query, set it to "null"   
                 else:
-                    row_data[column_name] = "null"
+                    row_data[column_name] = None
             # Add row_data to table_datainsert into students (id) values ('20141234');
             
             table_data = pickle.loads(self.my_data_db.get(table_name.encode(), pickle.dumps([])))
@@ -1324,7 +1345,7 @@ class MyTransformer(Transformer):
                 return
             if column_type.startswith('char'):
                 if value is None:
-                    values[i] = "null"
+                    values[i] = None
                 elif value.startswith(("'", '"')) == False:
                     self.printer.insert_value_error()
                     return
@@ -1335,7 +1356,7 @@ class MyTransformer(Transformer):
                         # Update the value in the values list
                         values[i] = value
             if column_type == 'int' and value is None:
-                values[i] = "null"
+                values[i] = None
 
             elif column_type == 'int' and not str(value).isdigit():
                 self.printer.insert_value_error()
@@ -1348,7 +1369,7 @@ class MyTransformer(Transformer):
                     self.printer.insert_value_error()
                     return
             if column_type == 'date' and value is None:
-                values[i] = "null"
+                values[i] = None
             
             
         # Prepare the row data as a dictionary
@@ -1357,6 +1378,7 @@ class MyTransformer(Transformer):
         # Insert the values into the table
         table_data = pickle.loads(self.my_data_db.get(table_name.encode(), pickle.dumps([])))
         table_data.append(row_data)
+        
         self.my_data_db.put(table_name.encode(), pickle.dumps(table_data))
 
         # Print success message
@@ -1422,7 +1444,7 @@ class MyTransformer(Transformer):
                 where_clause_operators = where_clause_operators + [child.children[0].value.lower() for child in where_clause_operator_iter]
                 
                 for child in where_clause_null_iter:
-                    where_clause_values =where_clause_values + ['null']
+                    where_clause_values =where_clause_values + ["null"]
                     if child.children[1] is None:
                         where_clause_operators = where_clause_operators + [child.children[0].value]
                     else:
@@ -1464,15 +1486,15 @@ class MyTransformer(Transformer):
                                         where_clause_values[i] = where_clause_values[i][:int(column_type.split('(')[1][:-1])+1]
                                         # Update the value in the values list
                                         where_clause_values[i] = where_clause_values[i]
-                            if column_type == 'int' and (not(str(where_clause_values[i]).isdigit()) and where_clause_values[i] != 'null'):                
+                            if column_type == 'int' and (not(str(where_clause_values[i]).isdigit()) and where_clause_values[i] != "null"):                
                                 self.printer.where_incomparable_error()
                                 return
                             
-                            if(where_clause_values[i] == 'null' and where_clause_operators[i] not in ['is', 'is not']):
+                            if(where_clause_values[i] == "null" and where_clause_operators[i] not in ['is', 'is not']):
                                 
                                 self.printer.where_incomparable_error()
                                 return
-                            if(where_clause_values[i] != 'null'):
+                            if(where_clause_values[i] != "null"):
                                 if column_type.startswith('char') and where_clause_operators[i] not in ['=', '!=']:
                                 
                                     self.printer.where_incomparable_error()
@@ -1490,14 +1512,15 @@ class MyTransformer(Transformer):
         
                
                 if(boolean_factor_cnt == 1 & boolean_term_cnt == 1): # just one where clause
-                   
+                    
                     for row in table_data:
                         # Assume that where_clause_operator is the comparison operator
                         # if the values are string, stripe the quote 
                         if where_clause_values[0].startswith(("'", '"')) :
                             where_clause_values[0] = where_clause_values[0][1:-1]
-                        if row[where_clause_attributes[0]].startswith(("'", '"')) :
-                            row[where_clause_attributes[0]] = row[where_clause_attributes[0]][1:-1]
+                        if row[where_clause_attributes[0]] is not None:
+                            if row[where_clause_attributes[0]].startswith(("'", '"')) :
+                                row[where_clause_attributes[0]] = row[where_clause_attributes[0]][1:-1]
 
                         tree_str = str(items[3].children[1].children[0].children[0])
                         comp_op_position = tree_str.find("'comp_op'")
@@ -1533,13 +1556,15 @@ class MyTransformer(Transformer):
                         # if the values are string, stripe the quote 
                         if where_clause_values[0].startswith(("'", '"')) :
                             where_clause_values[0] = where_clause_values[0][1:-1]
-                        if row[where_clause_attributes[0]].startswith(("'", '"')) :
-                            row[where_clause_attributes[0]] = row[where_clause_attributes[0]][1:-1]
+                        if row[where_clause_attributes[0]] is not None:
+                            if row[where_clause_attributes[0]].startswith(("'", '"')) :
+                                row[where_clause_attributes[0]] = row[where_clause_attributes[0]][1:-1]
 
                         if where_clause_values[1].startswith(("'", '"')) :
                             where_clause_values[1] = where_clause_values[1][1:-1]
-                        if row[where_clause_attributes[1]].startswith(("'", '"')) :
-                            row[where_clause_attributes[1]] = row[where_clause_attributes[1]][1:-1]
+                        if row[where_clause_attributes[1]] is not None:
+                            if row[where_clause_attributes[1]].startswith(("'", '"')) :
+                                row[where_clause_attributes[1]] = row[where_clause_attributes[1]][1:-1]
 
                         if comp_op_position0 <= comparable_value_position0: # comp_op comes first
                             if comp_op_position1 <= comparable_value_position1: # comp_op comes first
@@ -1590,13 +1615,16 @@ class MyTransformer(Transformer):
                         # if the values are string, stripe the quote 
                         if where_clause_values[0].startswith(("'", '"')) :
                             where_clause_values[0] = where_clause_values[0][1:-1]
-                        if row[where_clause_attributes[0]].startswith(("'", '"')) :
-                            row[where_clause_attributes[0]] = row[where_clause_attributes[0]][1:-1]
+                        if row[where_clause_attributes[0]] is not None:
+                            if row[where_clause_attributes[0]].startswith(("'", '"')) :
+                                row[where_clause_attributes[0]] = row[where_clause_attributes[0]][1:-1]
+
 
                         if where_clause_values[1].startswith(("'", '"')) :
                             where_clause_values[1] = where_clause_values[1][1:-1]
-                        if row[where_clause_attributes[1]].startswith(("'", '"')) :
-                            row[where_clause_attributes[1]] = row[where_clause_attributes[1]][1:-1]
+                        if row[where_clause_attributes[1]] is not None:
+                            if row[where_clause_attributes[1]].startswith(("'", '"')) :
+                                row[where_clause_attributes[1]] = row[where_clause_attributes[1]][1:-1]
 
                         if comp_op_position0 <= comparable_value_position0: # comp_op comes first
                             if comp_op_position1 <= comparable_value_position1: # comp_op comes first
