@@ -21,6 +21,10 @@ def is_valid_date_format(date_string, date_format):
 date_format = '%Y-%m-%d'
 
 def comparator(operand1, operator, operand2):
+    if operand1.isdigit():
+        operand1 = int(operand1)
+    if operand2.isdigit():
+        operand2 = int(operand2)
     if operator == '=' and operand1 != operand2:
         return False
     elif operator == '<' and operand1 >= operand2:
@@ -520,7 +524,7 @@ class MyTransformer(Transformer):
                 const2 = 'gf'
                 for child in where_clause_value_iter:
                     where_clause_value_cnt += 1
-                    where_clause_value = child.children[0].value.lower()
+                    where_clause_value = child.children[0].value
                     if const1 == '':
                         const1 = where_clause_value
                     else:
@@ -746,7 +750,8 @@ class MyTransformer(Transformer):
             
             # case 1: where clause has only one condition
             
-            if boolean_factor_cnt == 1 :           
+            if boolean_factor_cnt == 1 :
+                         
                 if const_flags[0] == False:
                     tree_itr = items[2].find_data("boolean_factor")
                     for tree in tree_itr:
@@ -788,10 +793,12 @@ class MyTransformer(Transformer):
                     
                     # Filter the data
                     
+                    
                     if isinstance(where_clause_values[0], str) and where_clause_values[0].startswith(("'", '"')):
                         where_clause_values[0] = where_clause_values[0][1:-1]
-                    #if where_clause_values[0].isdigit():
-                    #   where_clause_values[0] = int(where_clause_values[0])
+                    
+                    
+                    
                     for row in result_data:
                         
                         # Assume that where_clause_operator is the comparison operator
@@ -805,15 +812,13 @@ class MyTransformer(Transformer):
                         if where_clause_attributes2[0] != '':
                             if isinstance(row[where_clause_attributes2[0]], str) and row[where_clause_attributes2[0]].startswith(("'", '"')):
                                 row[where_clause_attributes2[0]] = row[where_clause_attributes2[0]][1:-1]
-                        #if row[column_name].isdigit():
-                        #   row[column_name] = int(row[column_name])
+                       
                         if where_clause_attributes2[0] != '':
                             operand2 = where_clause_values[0] if comparable_value_position != -1 else row[where_clause_attributes2[0]]
                         else:
                             operand2 = where_clause_values[0] 
                         
-                        if comp_op_position <= comparable_value_position or comparable_value_position == -1: # comp_op comes first
-                            
+                        if comp_op_position <= comparable_value_position or comparable_value_position == -1: # comp_op comes first       
                             if (comparator(row[column_name],where_clause_operators[0],operand2)):
                                 filtered_data.append(row)
                         elif comp_op_position > comparable_value_position: # comparable_value comes first
@@ -823,13 +828,16 @@ class MyTransformer(Transformer):
                     if filtered_data == []:
                         filtered_data = [{}]
                 else:
+                    if(where_clause_values[0].startswith(("'", '"'))):
+                        where_clause_values[0] = where_clause_values[0][1:-1]
                     if comparator(where_clause_attributes1[0],where_clause_operators[0],where_clause_values[0]):
+                        
                         filtered_data = result_data
                     else:
                         filtered_data = [{}]
                 
                 result_data = filtered_data
-               
+                
             
             # case 2: And condition
             elif boolean_term_cnt == 1 and boolean_factor_cnt > 1:
@@ -886,10 +894,10 @@ class MyTransformer(Transformer):
                             where_clause_attributes2[i] = table_name2 + '.' + where_clause_attributes2[i]
                 # Filter the data
                 for i in range(len(values)):
+                    
                     if isinstance(values[i], str) and values[i].startswith(("'", '"')):
                         values[i] = values[i][1:-1]
-                   # if values[i].isdigit():
-                    #    values[i] = int(values[i])
+                    
                 for row in result_data:
                     
                     conditions_met = []
@@ -898,14 +906,15 @@ class MyTransformer(Transformer):
                         
                             if row[column_names[i]] == 'null' and operators[i] not in ['is', 'is not']:
                                 continue
+                            
 
                             if isinstance(row[column_names[i]], str) and row[column_names[i]].startswith(("'", '"')):
                                 row[column_names[i]] = row[column_names[i]][1:-1]
                             if where_clause_attributes2[i] != '':
+                                
                                 if isinstance(row[where_clause_attributes2[i]], str) and row[where_clause_attributes2[i]].startswith(("'", '"')):
                                     row[where_clause_attributes2[i]] = row[where_clause_attributes2[i]][1:-1]
-                        # if row[column_names[i]].isdigit():
-                            #    row[column_names[i]] = int(row[column_names[i]])
+                            
                             if where_clause_attributes2[i] != '':
                                 operand2 = values[i] if comparable_value_positions[i] != -1 else row[where_clause_attributes2[i]]
                             else:
@@ -924,6 +933,8 @@ class MyTransformer(Transformer):
                                 else:
                                     conditions_met.append(False)   
                         else:
+                            if where_clause_values[i].startswith(("'", '"')):
+                                where_clause_values[i] = where_clause_values[i][1:-1]
                             conditions_met.append(comparator(where_clause_attributes1[i],operators[i],where_clause_values[i]))
                     if all(conditions_met):
                         filtered_data.append(row)
@@ -984,11 +995,12 @@ class MyTransformer(Transformer):
                             where_clause_attributes2[i] = table_name2 + '.' + where_clause_attributes2[i]
                 # Filter the data
                 for i in range(len(values)):
+
+                    
                     if isinstance(values[i], str) and values[i].startswith(("'", '"')):
                         values[i] = values[i][1:-1]
                     
-                   # if values[i].isdigit():
-                    #    values[i] = int(values[i])
+                    
                 
                 for row in result_data:
                     conditions_met = []
@@ -999,19 +1011,19 @@ class MyTransformer(Transformer):
                             
                             if row[column_names[i]] == 'null' and operators[i] not in ['is', 'is not']:
                                 continue
-
+                           
                             if isinstance(row[column_names[i]], str) and row[column_names[i]].startswith(("'", '"')):
                                 row[column_names[i]] = row[column_names[i]][1:-1]
                             if where_clause_attributes2[i] != '':
+                                
                                 if isinstance(row[where_clause_attributes2[i]], str) and row[where_clause_attributes2[i]].startswith(("'", '"')):
                                     row[where_clause_attributes2[i]] = row[where_clause_attributes2[i]][1:-1]
-                        # if row[column_names[i]].isdigit():
-                            #    row[column_names[i]] = int(row[column_names[i]])
+                           
                             if where_clause_attributes2[i] != '':
                                 operand2 = values[i] if comparable_value_positions[i] != -1 else row[where_clause_attributes2[i]]
                             else:
                                 operand2 = values[i]
-                        
+                           
 
                             if comp_op_positions[i] <= comparable_value_positions[i] or comparable_value_positions[i] == -1:  # comp_op comes first
                                 if comparator(row[column_names[i]], operators[i], operand2):
@@ -1025,6 +1037,8 @@ class MyTransformer(Transformer):
                                 else:
                                     conditions_met.append(False)
                         else:
+                            if where_clause_values[i].startswith(("'", '"')):
+                                where_clause_values[i] = where_clause_values[i][1:-1]
                             conditions_met.append(comparator(where_clause_attributes1[i],operators[i],where_clause_values[i]))
                     if any(conditions_met):
                         filtered_data.append(row)
@@ -1133,12 +1147,14 @@ class MyTransformer(Transformer):
                     query_column_names[query_column_names.index(query_column_names[i])] = updated_column_name
     
             column_names = query_column_names
-            result_data = [{column_name: row[column_name] for column_name in column_names} for row in result_data]
+            
+            if result_data != [{}]:
+                result_data = [{column_name: row[column_name] for column_name in column_names} for row in result_data]
 
             
             
         # Calculate max length for each column
-       
+        
         try:
             if result_data[0]:
                 max_lengths = []
