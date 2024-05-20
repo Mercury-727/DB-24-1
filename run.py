@@ -656,14 +656,17 @@ class MyTransformer(Transformer):
                                                     return
                                     else:
                                         if column_type.startswith('char'):
+                                            
                                             if where_clause_values[i] is None:
                                                 where_clause_values[i] = "null"
                                             elif not isinstance(where_clause_values[i], str):
                                                 self.printer.where_incomparable_error()
                                                 return
                                             elif not where_clause_values[i].startswith(("'", '"')) and where_clause_values[i] != '':
-                                                self.printer.where_incomparable_error()
-                                                return
+                                                if not where_clause_values[i] == 'null':
+                                                    self.printer.where_incomparable_error()
+                                                    return
+                                                
                                             if isinstance(where_clause_values[i], str):
                                                 if len(where_clause_values[i]) > int(column_type.split('(')[1][:-1]):
                                                     where_clause_values[i] = where_clause_values[i][:int(column_type.split('(')[1][:-1])+1]
@@ -671,6 +674,7 @@ class MyTransformer(Transformer):
                                             self.printer.where_incomparable_error()
                                             return
                                         if where_clause_values[i] == 'null' and where_clause_operators[i] not in ['is', 'is not']:
+                                            
                                             self.printer.where_incomparable_error()
                                             return
                                         if where_clause_values[i] != 'null':
